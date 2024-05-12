@@ -178,20 +178,29 @@ export function modelOutputType(outputType: OutputType, args: EventArguments) {
       property.decorators.push({ name: 'HideField', arguments: [] });
     } else {
       // Generate `@Field()` decorator
+      let options = JSON5.stringify({
+        ...settings?.fieldArguments(),
+        nullable: Boolean(field.isNullable),
+        defaultValue: ['number', 'string', 'boolean'].includes(
+          typeof modelField?.default,
+        )
+          ? modelField?.default
+          : undefined,
+        description: modelField?.documentation,
+      });
+
+      const middleware = settings?.find(setting => setting.name === 'Middleware');
+      if (Array.isArray(middleware?.arguments) && middleware.arguments.length > 0) {
+        const text = options.slice(0, -1);
+        const middlewareString = `middleware:[${middleware.arguments.join(',')}]`;
+        options = `${text},${middlewareString}}`;
+      }
+
       property.decorators.push({
         name: 'Field',
         arguments: [
           isList ? `() => [${graphqlType}]` : `() => ${graphqlType}`,
-          JSON5.stringify({
-            ...settings?.fieldArguments(),
-            nullable: Boolean(field.isNullable),
-            defaultValue: ['number', 'string', 'boolean'].includes(
-              typeof modelField?.default,
-            )
-              ? modelField?.default
-              : undefined,
-            description: modelField?.documentation,
-          }),
+          options,
         ],
       });
 
@@ -215,6 +224,10 @@ export function modelOutputType(outputType: OutputType, args: EventArguments) {
           importDeclarations.create(decorate);
         }
       }
+    }
+
+    for (const middleware of config.middleware) {
+      importDeclarations.create(middleware);
     }
 
     eventEmitter.emitSync('ClassProperty', property, {

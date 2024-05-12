@@ -21,6 +21,14 @@ type DecorateElement = {
   defaultImport?: string | true;
   namespaceImport?: string;
 };
+type MiddlewareElement = {
+  from: string;
+  name: string;
+  arguments?: string[];
+  namedImport: boolean;
+  defaultImport?: string | true;
+  namespaceImport?: string;
+};
 
 export function createConfig(data: Record<string, unknown>) {
   const config = merge({}, unflatten(data, { delimiter: '_' })) as Record<
@@ -96,6 +104,27 @@ export function createConfig(data: Record<string, unknown>) {
     });
   }
 
+  const middleware: MiddlewareElement[] = [];
+  const configMiddleware: (Record<string, string> | undefined)[] = Object.values(
+    (config.middleware as any) || {},
+  );
+
+  for (const element of configMiddleware) {
+    if (!element) continue;
+    ok(
+      element.from && element.name,
+      `Missed 'from' or 'name' part in configuration for middleware`,
+    );
+    middleware.push({
+      from: element.from,
+      name: element.name,
+      namedImport: toBoolean(element.namedImport),
+      defaultImport: toBoolean(element.defaultImport) ? true : element.defaultImport,
+      namespaceImport: element.namespaceImport,
+      arguments: element.arguments ? JSON5.parse(element.arguments) : undefined,
+    });
+  }
+
   return {
     outputFilePattern,
     tsConfigFilePath: createTsConfigFilePathValue(config.tsConfigFilePath),
@@ -123,6 +152,7 @@ export function createConfig(data: Record<string, unknown>) {
       ImportNameSpec | undefined
     >,
     decorate,
+    middleware,
   };
 }
 
